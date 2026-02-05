@@ -1,5 +1,5 @@
 /* =====================================================
-   CONFIG
+   CONFIG – OPTIMIZED
 ===================================================== */
 
 const MODEL_URL =
@@ -10,12 +10,18 @@ const KNOWN_USERS = [
   { label: "sonji", dir: "sonji", samples: 2 }
 ];
 
-// Face match threshold
 // 0.45 = strict, 0.6 = loose
 const MATCH_THRESHOLD = 0.5;
 
-// Interval (ms) giữa các lần detect
+// Detection interval (ms)
 const DETECT_INTERVAL = 600;
+
+// TinyFaceDetector optimized
+const DETECTOR_OPTIONS =
+  new faceapi.TinyFaceDetectorOptions({
+    inputSize: 160,          // 🔥 faster ~30%
+    scoreThreshold: 0.5
+  });
 
 
 /* =====================================================
@@ -29,26 +35,26 @@ const nameEl = document.getElementById("name");
 
 
 /* =====================================================
-   MODEL LOADING
+   MODEL LOADING – MINIMAL
 ===================================================== */
 
 async function loadModels() {
-  statusEl.innerText = "Loading face models…";
+  statusEl.innerText = "Loading AI models…";
 
+  // 🔥 only required models
   await Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
   ]);
 }
 
 
 /* =====================================================
-   CAMERA
+   CAMERA – FAST START
 ===================================================== */
 
 async function startCamera() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("Camera not supported");
   }
 
@@ -73,11 +79,11 @@ async function startCamera() {
 
 
 /* =====================================================
-   LOAD KNOWN FACES
+   LOAD KNOWN FACE DESCRIPTORS
 ===================================================== */
 
 async function loadKnownFaces() {
-  statusEl.innerText = "Preparing known faces…";
+  statusEl.innerText = "Preparing face data…";
 
   const labeledDescriptors = [];
 
@@ -91,32 +97,26 @@ async function loadKnownFaces() {
         const img = await faceapi.fetchImage(imgUrl);
 
         const detection = await faceapi
-          .detectSingleFace(
-            img,
-            new faceapi.TinyFaceDetectorOptions({
-              inputSize: 224,
-              scoreThreshold: 0.5
-            })
-          )
-          .withFaceLandmarks()
+          .detectSingleFace(img, DETECTOR_OPTIONS)
           .withFaceDescriptor();
 
-        if (detection) {
+        if (detection?.descriptor) {
           descriptors.push(detection.descriptor);
         } else {
-          console.warn(`No face found: ${imgUrl}`);
+          console.warn("No face:", imgUrl);
         }
       } catch (err) {
-        console.error(`Failed loading ${imgUrl}`, err);
+        console.warn("Load failed:", imgUrl);
       }
     }
 
     if (descriptors.length > 0) {
       labeledDescriptors.push(
-        new faceapi.LabeledFaceDescriptors(user.label, descriptors)
+        new faceapi.LabeledFaceDescriptors(
+          user.label,
+          descriptors
+        )
       );
-    } else {
-      console.warn(`No valid descriptors for ${user.label}`);
     }
   }
 
@@ -125,7 +125,7 @@ async function loadKnownFaces() {
 
 
 /* =====================================================
-   FACE RECOGNITION LOOP
+   FACE RECOGNITION LOOP – STABLE
 ===================================================== */
 
 function startRecognition(faceMatcher) {
@@ -135,21 +135,16 @@ function startRecognition(faceMatcher) {
 
   const timer = setInterval(async () => {
     if (locked) return;
+    if (video.paused || video.ended) return;
 
     const detection = await faceapi
-      .detectSingleFace(
-        video,
-        new faceapi.TinyFaceDetectorOptions({
-          inputSize: 224,
-          scoreThreshold: 0.5
-        })
-      )
-      .withFaceLandmarks()
+      .detectSingleFace(video, DETECTOR_OPTIONS)
       .withFaceDescriptor();
 
     if (!detection) return;
 
-    const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+    const bestMatch =
+      faceMatcher.findBestMatch(detection.descriptor);
 
     if (bestMatch.label !== "unknown") {
       locked = true;
@@ -165,7 +160,7 @@ function startRecognition(faceMatcher) {
 
 
 /* =====================================================
-   BOOTSTRAP
+   BOOTSTRAP – PARALLEL INIT
 ===================================================== */
 
 startBtn.addEventListener("click", async () => {
@@ -173,31 +168,29 @@ startBtn.addEventListener("click", async () => {
     startBtn.disabled = true;
     statusEl.innerText = "Initializing…";
 
-    // 1. Load models
-    await loadModels();
+    // 🔥 Parallel = faster perceived load
+    await Promise.all([
+      loadModels(),
+      startCamera()
+    ]);
 
-    // 2. Start camera
-    await startCamera();
-
-    // 3. Load known faces
     const labeledFaces = await loadKnownFaces();
 
     if (labeledFaces.length === 0) {
-      throw new Error("No valid face data");
+      throw new Error("No face data available");
     }
 
-    // 4. Create matcher
-    const matcher = new faceapi.FaceMatcher(
-      labeledFaces,
-      MATCH_THRESHOLD
-    );
+    const matcher =
+      new faceapi.FaceMatcher(
+        labeledFaces,
+        MATCH_THRESHOLD
+      );
 
-    // 5. Start recognition loop
     startRecognition(matcher);
 
   } catch (err) {
     console.error(err);
-    statusEl.innerText = `${err.name}: ${err.message}`;
+    statusEl.innerText = err.message;
     startBtn.disabled = false;
   }
 });

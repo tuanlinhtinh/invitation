@@ -44,13 +44,29 @@ async function loadKnownFaces() {
 const video = document.getElementById("video");
 
 async function startCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error("getUserMedia not supported");
+  }
+
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "user" },
+    video: {
+      facingMode: "user",
+      width: { ideal: 720 },
+      height: { ideal: 720 }
+    },
     audio: false
   });
 
   video.srcObject = stream;
+
+  return new Promise(resolve => {
+    video.onloadedmetadata = () => {
+      video.play();
+      resolve();
+    };
+  });
 }
+
 
 async function startRecognition(faceMatcher) {
   const status = document.getElementById("status");

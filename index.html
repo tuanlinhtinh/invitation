@@ -8,8 +8,9 @@
   />
   <title>Invitation</title>
 
-  <!-- Face API core -->
-  <script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <!-- Face API -->
+  <script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <script defer src="app.js"></script>
 
   <style>
     html, body {
@@ -103,129 +104,5 @@
     <div id="status">Initializing…</div>
     <div id="name"></div>
   </div>
-
-  <script>
-    /* ================= CONFIG ================= */
-
-    const MODEL_URL =
-      "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
-
-    const KNOWN_USERS = [
-      { label: "linh", dir: "linh", samples: 2 },
-      { label: "kiet", dir: "kiet", samples: 2 },
-      { label: "sonji", dir: "sonji", samples: 2 },
-      { label: "dung", dir: "dung", samples: 2 },
-      { label: "minh", dir: "minh", samples: 2 }
-    ];
-
-    const THRESHOLD = 0.5;
-
-    /* ========================================== */
-
-    const video = document.getElementById("video");
-    const statusEl = document.getElementById("status");
-    const nameEl = document.getElementById("name");
-    const startBtn = document.getElementById("start");
-
-    async function loadModels() {
-      statusEl.innerText = "Loading models…";
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-      ]);
-    }
-
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 720 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
-
-      video.srcObject = stream;
-
-      return new Promise(resolve => {
-        video.onloadedmetadata = () => {
-          video.play();
-          resolve();
-        };
-      });
-    }
-
-    async function loadKnownFaces() {
-      statusEl.innerText = "Preparing faces…";
-
-      return Promise.all(
-        KNOWN_USERS.map(async user => {
-          const descriptors = [];
-
-          for (let i = 1; i <= user.samples; i++) {
-            const img = await faceapi.fetchImage(
-              `/faces/${user.dir}/${i}.jpg`
-            );
-
-            const det = await faceapi
-              .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
-              .withFaceLandmarks()
-              .withFaceDescriptor();
-
-            if (det) descriptors.push(det.descriptor);
-          }
-
-          return new faceapi.LabeledFaceDescriptors(
-            user.label,
-            descriptors
-          );
-        })
-      );
-    }
-
-    async function recognize(matcher) {
-      statusEl.innerText = "Looking for your face…";
-      let locked = false;
-
-      const interval = setInterval(async () => {
-        if (locked) return;
-
-        const det = await faceapi
-          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-
-        if (!det) return;
-
-        const best = matcher.findBestMatch(det.descriptor);
-
-        if (best.label !== "unknown") {
-          locked = true;
-          nameEl.innerText = `Welcome, ${best.label}`;
-          statusEl.innerText = "Recognized";
-          startBtn.style.display = "none";
-          clearInterval(interval);
-        }
-      }, 600);
-    }
-
-    startBtn.addEventListener("click", async () => {
-      try {
-        startBtn.disabled = true;
-        await loadModels();
-        await startCamera();
-
-        const labeled = await loadKnownFaces();
-        const matcher = new faceapi.FaceMatcher(labeled, THRESHOLD);
-
-        recognize(matcher);
-      } catch (e) {
-        console.error(e);
-        statusEl.innerText = `${e.name}: ${e.message}`;
-        startBtn.disabled = false;
-      }
-    });
-  </script>
 </body>
 </html>

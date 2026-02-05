@@ -4,7 +4,7 @@ const KNOWN_USERS = [
 ];
 
 async function loadModels() {
-  const URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
+  const URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.esm.min.js";
 
   await Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(URL),

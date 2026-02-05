@@ -7,6 +7,8 @@ const MODEL_URL =
 
 const KNOWN_USERS = [
   { label: "kiet", dir: "kiet", samples: 3 },
+  { label: "linh", dir: "linh", samples: 2 },
+  { label: "minh", dir: "minh", samples: 2 },
   { label: "sonji", dir: "sonji", samples: 2 }
 ];
 

@@ -1,28 +1,36 @@
 /* =====================================================
-   CONFIG – OPTIMIZED
+   CONFIG
 ===================================================== */
 
 const MODEL_URL =
   "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
 
 const KNOWN_USERS = [
-  { label: "kiet", dir: "kiet", samples: 3 },
   { label: "linh", dir: "linh", samples: 2 },
   { label: "minh", dir: "minh", samples: 2 },
-  { label: "sonji", dir: "sonji", samples: 2 }
+  { label: "sonji", dir: "sonji", samples: 2 },
+  { label: "kiet", dir: "kiet", samples: 2 }
 ];
 
-// 0.45 = strict, 0.6 = loose
 const MATCH_THRESHOLD = 0.5;
-
-// Detection interval (ms)
 const DETECT_INTERVAL = 600;
 
-// TinyFaceDetector optimized
-const DETECTOR_OPTIONS =
+/* =========================
+   DETECTOR OPTIONS
+========================= */
+
+// 🔥 camera: nhanh & ổn định
+const VIDEO_DETECT_OPTIONS =
   new faceapi.TinyFaceDetectorOptions({
-    inputSize: 160,          // 🔥 faster ~30%
+    inputSize: 160,
     scoreThreshold: 0.5
+  });
+
+// 🔥 image: dễ detect hơn
+const IMAGE_DETECT_OPTIONS =
+  new faceapi.TinyFaceDetectorOptions({
+    inputSize: 224,
+    scoreThreshold: 0.3
   });
 
 
@@ -37,13 +45,12 @@ const nameEl = document.getElementById("name");
 
 
 /* =====================================================
-   MODEL LOADING – MINIMAL
+   MODEL LOADING
 ===================================================== */
 
 async function loadModels() {
   statusEl.innerText = "Loading AI models…";
 
-  // 🔥 only required models
   await Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
@@ -52,7 +59,7 @@ async function loadModels() {
 
 
 /* =====================================================
-   CAMERA – FAST START
+   CAMERA
 ===================================================== */
 
 async function startCamera() {
@@ -81,7 +88,7 @@ async function startCamera() {
 
 
 /* =====================================================
-   LOAD KNOWN FACE DESCRIPTORS
+   LOAD KNOWN FACES – FAIL SAFE
 ===================================================== */
 
 async function loadKnownFaces() {
@@ -94,21 +101,23 @@ async function loadKnownFaces() {
 
     for (let i = 1; i <= user.samples; i++) {
       const imgUrl = `/faces/${user.dir}/${i}.jpg`;
+      console.log("Loading face:", imgUrl);
 
       try {
         const img = await faceapi.fetchImage(imgUrl);
 
         const detection = await faceapi
-          .detectSingleFace(img, DETECTOR_OPTIONS)
+          .detectSingleFace(img, IMAGE_DETECT_OPTIONS)
           .withFaceDescriptor();
 
         if (detection?.descriptor) {
+          console.log("Face OK:", imgUrl);
           descriptors.push(detection.descriptor);
         } else {
-          console.warn("No face:", imgUrl);
+          console.warn("NO FACE FOUND:", imgUrl);
         }
       } catch (err) {
-        console.warn("Load failed:", imgUrl);
+        console.warn("FAILED LOAD:", imgUrl);
       }
     }
 
@@ -119,6 +128,8 @@ async function loadKnownFaces() {
           descriptors
         )
       );
+    } else {
+      console.warn(`No valid face data for ${user.label}`);
     }
   }
 
@@ -127,7 +138,7 @@ async function loadKnownFaces() {
 
 
 /* =====================================================
-   FACE RECOGNITION LOOP – STABLE
+   FACE RECOGNITION LOOP
 ===================================================== */
 
 function startRecognition(faceMatcher) {
@@ -140,7 +151,7 @@ function startRecognition(faceMatcher) {
     if (video.paused || video.ended) return;
 
     const detection = await faceapi
-      .detectSingleFace(video, DETECTOR_OPTIONS)
+      .detectSingleFace(video, VIDEO_DETECT_OPTIONS)
       .withFaceDescriptor();
 
     if (!detection) return;
@@ -156,7 +167,7 @@ function startRecognition(faceMatcher) {
 
       statusEl.innerText = "Recognized";
       startBtn.style.display = "none";
-      
+
       clearInterval(timer);
     }
   }, DETECT_INTERVAL);
@@ -164,7 +175,7 @@ function startRecognition(faceMatcher) {
 
 
 /* =====================================================
-   BOOTSTRAP – PARALLEL INIT
+   BOOTSTRAP – FAIL SAFE
 ===================================================== */
 
 startBtn.addEventListener("click", async () => {
@@ -172,7 +183,6 @@ startBtn.addEventListener("click", async () => {
     startBtn.disabled = true;
     statusEl.innerText = "Initializing…";
 
-    // 🔥 Parallel = faster perceived load
     await Promise.all([
       loadModels(),
       startCamera()
@@ -180,8 +190,11 @@ startBtn.addEventListener("click", async () => {
 
     const labeledFaces = await loadKnownFaces();
 
+    // 🔥 FAIL SAFE – không crash
     if (labeledFaces.length === 0) {
-      throw new Error("No face data available");
+      statusEl.innerText = "Face data unavailable";
+      console.warn("No known faces loaded");
+      return;
     }
 
     const matcher =

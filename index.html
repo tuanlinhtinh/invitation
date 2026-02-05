@@ -2,96 +2,113 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+  />
   <title>Invitation</title>
 
-  <!-- Face API core -->
-  <script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <!-- Face API -->
+  <script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
 
   <style>
     html, body {
       margin: 0;
-      width: 100%;
+      padding: 0;
       height: 100%;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #0b0b0b;
-      color: white;
+      background: #000;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
     }
 
-    .card {
+    /* =========================
+       STAGE
+    ========================== */
+    #stage {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* BG0 */
+    #bg0 {
+      position: absolute;
+      inset: 0;
+      background: url("/img/bg0.png") center / cover no-repeat;
+      z-index: 0;
+    }
+
+    /* Camera */
+    #video {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: min(360px, 92vw);
-      padding: 24px;
-      border-radius: 22px;
-      text-align: center;
-      background: rgba(255,255,255,0.08);
-      backdrop-filter: blur(14px);
-    }
-
-    h1 {
-      letter-spacing: 0.15em;
-      margin-top: 0;
-    }
-
-    .camera {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      border-radius: 18px;
-      overflow: hidden;
-      margin: 18px 0;
-      background: black;
-    }
-
-    video {
-      width: 100%;
-      height: 100%;
+      width: min(72vw, 72vh);
+      height: min(72vw, 72vh);
       object-fit: cover;
+      border-radius: 50%;
+      background: #000;
+      z-index: 1;
     }
 
-    button {
+    /* BG1 overlay */
+    #bg1 {
+      position: absolute;
+      inset: 0;
+      background: url("/img/bg1.png") center / cover no-repeat;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* =========================
+       UI (giữ ID cũ)
+    ========================== */
+    #status {
+      position: absolute;
+      top: 20px;
       width: 100%;
-      padding: 14px;
-      border-radius: 14px;
-      border: none;
-      background: white;
-      color: black;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
+      text-align: center;
+      font-size: 14px;
+      color: #fff;
+      opacity: 0.8;
+      z-index: 3;
     }
 
     #name {
-      font-size: 1.2rem;
+      position: absolute;
+      bottom: 12vh;
+      width: 100%;
+      text-align: center;
+      font-size: clamp(22px, 4vw, 32px);
       font-weight: 600;
-      margin-top: 10px;
+      color: #fff;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: 0.4s ease;
+      z-index: 3;
     }
 
-    #status {
-      font-size: 0.9rem;
-      opacity: 0.75;
-      margin-top: 8px;
+    #name.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #start {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 22px;
+      border-radius: 24px;
+      border: none;
+      font-size: 15px;
+      z-index: 4;
+      cursor: pointer;
     }
   </style>
 </head>
-
-<body>
-  <div class="card">
-    <h1>WELCOME</h1>
-    <p>Tap to start</p>
-
-    <div class="camera">
-      <video id="video" muted playsinline></video>
-    </div>
-
-    <button id="start">Start Experience</button>
-
-    <div id="name"></div>
-    <div id="status">Waiting…</div>
-  </div>
-
   <script>
     /* ================= CONFIG ================= */
 
@@ -100,9 +117,9 @@
 
     const KNOWN_USERS = [
       { label: "linh", dir: "linh", samples: 2 },
-      { label: "minh", dir: "minh", samples: 2 },
-      { label: "sonji", dir: "sonji", samples: 3 },
-      { label: "kiet", dir: "kiet", samples: 3 }
+  { label: "minh", dir: "minh", samples: 2 },
+  { label: "sonji", dir: "sonji", samples: 3 },
+  { label: "kiet", dir: "kiet", samples: 3 }
     ];
 
     const THRESHOLD = 0.5;
@@ -214,5 +231,21 @@
       }
     });
   </script>
+<body>
+
+  <!-- 🔒 GIỮ NGUYÊN CẤU TRÚC + ID -->
+  <div id="stage">
+    <div id="bg0"></div>
+
+    <video id="video" playsinline muted></video>
+
+    <div id="bg1"></div>
+
+    <div id="status">Camera permission required</div>
+    <div id="name"></div>
+
+    <button id="start">Start</button>
+  </div>
+
 </body>
 </html>

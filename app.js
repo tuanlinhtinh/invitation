@@ -3,15 +3,17 @@ const KNOWN_USERS = [
   { label: "Sonji", dir: "sonji", samples: 3 }
 ];
 
-async function loadModels() {
-  const URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.esm.min.js";
+const MODEL_URL =
+  "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
 
+async function loadModels() {
   await Promise.all([
-    faceapi.nets.tinyFaceDetector.loadFromUri(URL),
-    faceapi.nets.faceLandmark68Net.loadFromUri(URL),
-    faceapi.nets.faceRecognitionNet.loadFromUri(URL),
+    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
   ]);
 }
+
 
 
 async function loadKnownFaces() {

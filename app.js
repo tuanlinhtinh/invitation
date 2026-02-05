@@ -8,8 +8,8 @@ const MODEL_URL =
 const KNOWN_USERS = [
   { label: "linh", dir: "linh", samples: 2 },
   { label: "minh", dir: "minh", samples: 2 },
-  { label: "sonji", dir: "sonji", samples: 2 },
-  { label: "kiet", dir: "kiet", samples: 2 }
+  { label: "sonji", dir: "sonji", samples: 3 },
+  { label: "kiet", dir: "kiet", samples: 3 }
 ];
 
 const MATCH_THRESHOLD = 0.5;

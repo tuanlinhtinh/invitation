@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invitation</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="lib/face-api.min.js"></script>
+  <script defer src="app.js"></script>
+</head>
+
+<body>
+  <div class="background"></div>
+
+  <div class="card">
+    <h1>WELCOME</h1>
+    <p class="subtitle">You are invited</p>
+
+    <div class="camera-frame">
+      <video id="video" autoplay muted playsinline></video>
+    </div>
+
+    <p id="status">Initializing camera…</p>
+    <p id="viewer-name"></p>
+  </div>
+</body>
+</html>

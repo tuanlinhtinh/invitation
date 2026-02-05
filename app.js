@@ -1,12 +1,40 @@
-const KNOWN_USERS = [
-  { label: "Kiet Nguyen", dir: "kietnguyen", samples: 3 },
-  { label: "Sonji", dir: "sonji", samples: 3 }
-];
+/* =====================================================
+   CONFIG
+===================================================== */
 
 const MODEL_URL =
   "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
 
+const KNOWN_USERS = [
+  { label: "kiet", dir: "kiet", samples: 3 },
+  { label: "sonji", dir: "sonji", samples: 2 }
+];
+
+// Face match threshold
+// 0.45 = strict, 0.6 = loose
+const MATCH_THRESHOLD = 0.5;
+
+// Interval (ms) giữa các lần detect
+const DETECT_INTERVAL = 600;
+
+
+/* =====================================================
+   DOM
+===================================================== */
+
+const video = document.getElementById("video");
+const startBtn = document.getElementById("start");
+const statusEl = document.getElementById("status");
+const nameEl = document.getElementById("name");
+
+
+/* =====================================================
+   MODEL LOADING
+===================================================== */
+
 async function loadModels() {
+  statusEl.innerText = "Loading face models…";
+
   await Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -15,40 +43,13 @@ async function loadModels() {
 }
 
 
-
-async function loadKnownFaces() {
-  return Promise.all(
-    KNOWN_USERS.map(async user => {
-      const descriptors = [];
-
-      for (let i = 1; i <= user.samples; i++) {
-        const img = await faceapi.fetchImage(
-          `/faces/${user.dir}/${i}.jpg`
-        );
-
-        const detection = await faceapi
-          .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-
-        if (detection) {
-          descriptors.push(detection.descriptor);
-        }
-      }
-
-      return new faceapi.LabeledFaceDescriptors(
-        user.label,
-        descriptors
-      );
-    })
-  );
-}
-
-const video = document.getElementById("video");
+/* =====================================================
+   CAMERA
+===================================================== */
 
 async function startCamera() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    throw new Error("getUserMedia not supported");
+    throw new Error("Camera not supported");
   }
 
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -71,49 +72,132 @@ async function startCamera() {
 }
 
 
-async function startRecognition(faceMatcher) {
-  const status = document.getElementById("status");
-  const nameEl = document.getElementById("viewer-name");
+/* =====================================================
+   LOAD KNOWN FACES
+===================================================== */
 
-  status.innerText = "Looking for your face…";
+async function loadKnownFaces() {
+  statusEl.innerText = "Preparing known faces…";
+
+  const labeledDescriptors = [];
+
+  for (const user of KNOWN_USERS) {
+    const descriptors = [];
+
+    for (let i = 1; i <= user.samples; i++) {
+      const imgUrl = `/faces/${user.dir}/${i}.jpg`;
+
+      try {
+        const img = await faceapi.fetchImage(imgUrl);
+
+        const detection = await faceapi
+          .detectSingleFace(
+            img,
+            new faceapi.TinyFaceDetectorOptions({
+              inputSize: 224,
+              scoreThreshold: 0.5
+            })
+          )
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (detection) {
+          descriptors.push(detection.descriptor);
+        } else {
+          console.warn(`No face found: ${imgUrl}`);
+        }
+      } catch (err) {
+        console.error(`Failed loading ${imgUrl}`, err);
+      }
+    }
+
+    if (descriptors.length > 0) {
+      labeledDescriptors.push(
+        new faceapi.LabeledFaceDescriptors(user.label, descriptors)
+      );
+    } else {
+      console.warn(`No valid descriptors for ${user.label}`);
+    }
+  }
+
+  return labeledDescriptors;
+}
+
+
+/* =====================================================
+   FACE RECOGNITION LOOP
+===================================================== */
+
+function startRecognition(faceMatcher) {
+  statusEl.innerText = "Looking for your face…";
 
   let locked = false;
 
-  setInterval(async () => {
+  const timer = setInterval(async () => {
     if (locked) return;
 
     const detection = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .detectSingleFace(
+        video,
+        new faceapi.TinyFaceDetectorOptions({
+          inputSize: 224,
+          scoreThreshold: 0.5
+        })
+      )
       .withFaceLandmarks()
       .withFaceDescriptor();
 
     if (!detection) return;
 
-    const result = faceMatcher.findBestMatch(detection.descriptor);
+    const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
 
-    if (result.label !== "unknown") {
+    if (bestMatch.label !== "unknown") {
       locked = true;
 
-      status.innerText = "Recognized";
-      nameEl.innerText = `Welcome, ${result.label}`;
+      nameEl.innerText = `Welcome, ${bestMatch.label}`;
+      statusEl.innerText = "Recognized";
+
+      startBtn.style.display = "none";
+      clearInterval(timer);
     }
-  }, 600);
+  }, DETECT_INTERVAL);
 }
 
-(async () => {
-  try {
-    await loadModels();
-    document.getElementById("status").innerText = "Models loaded";
 
+/* =====================================================
+   BOOTSTRAP
+===================================================== */
+
+startBtn.addEventListener("click", async () => {
+  try {
+    startBtn.disabled = true;
+    statusEl.innerText = "Initializing…";
+
+    // 1. Load models
+    await loadModels();
+
+    // 2. Start camera
     await startCamera();
 
+    // 3. Load known faces
     const labeledFaces = await loadKnownFaces();
-    const faceMatcher = new faceapi.FaceMatcher(labeledFaces, 0.5);
 
-    startRecognition(faceMatcher);
-  } catch (e) {
-    document.getElementById("status").innerText =
-      "Camera permission required";
-    console.error(e);
+    if (labeledFaces.length === 0) {
+      throw new Error("No valid face data");
+    }
+
+    // 4. Create matcher
+    const matcher = new faceapi.FaceMatcher(
+      labeledFaces,
+      MATCH_THRESHOLD
+    );
+
+    // 5. Start recognition loop
+    startRecognition(matcher);
+
+  } catch (err) {
+    console.error(err);
+    statusEl.innerText = `${err.name}: ${err.message}`;
+    startBtn.disabled = false;
   }
-})();
+});

@@ -2,217 +2,136 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+  />
   <title>Invitation</title>
 
-  <!-- Face API core -->
-  <script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <!-- Face API -->
+  <script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <script defer src="app.js"></script>
 
   <style>
     html, body {
       margin: 0;
-      width: 100%;
+      padding: 0;
       height: 100%;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #0b0b0b;
-      color: white;
+      background: #000;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
     }
 
-    .card {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: min(360px, 92vw);
-      padding: 24px;
-      border-radius: 22px;
-      text-align: center;
-      background: rgba(255,255,255,0.08);
-      backdrop-filter: blur(14px);
-    }
-
-    h1 {
-      letter-spacing: 0.15em;
-      margin-top: 0;
-    }
-
-    .camera {
+    /* =========================
+       MAIN STAGE
+    ========================== */
+    .stage {
+      position: relative;
       width: 100%;
-      aspect-ratio: 1 / 1;
-      border-radius: 18px;
+      height: 100vh;
       overflow: hidden;
-      margin: 18px 0;
-      background: black;
+    }
+
+    /* BG0 */
+    .bg0 {
+      position: absolute;
+      inset: 0;
+      background: url("/img/bg0.png") center / cover no-repeat;
+      z-index: 0;
+    }
+
+    /* Camera wrapper */
+    .camera-wrap {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
     }
 
     video {
-      width: 100%;
-      height: 100%;
+      width: min(72vw, 72vh);
+      height: min(72vw, 72vh);
       object-fit: cover;
+      border-radius: 50%;
+      background: #000;
     }
 
-    button {
-      width: 100%;
-      padding: 14px;
-      border-radius: 14px;
-      border: none;
-      background: white;
-      color: black;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
+    /* BG1 overlay */
+    .bg1 {
+      position: absolute;
+      inset: 0;
+      background: url("/img/bg1.png") center / cover no-repeat;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* =========================
+       UI
+    ========================== */
+    .ui {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 10vh;
+      pointer-events: none;
+      color: white;
     }
 
     #name {
-      font-size: 1.2rem;
+      font-size: clamp(22px, 4vw, 32px);
       font-weight: 600;
-      margin-top: 10px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: 0.4s ease;
+    }
+
+    #name.show {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     #status {
-      font-size: 0.9rem;
-      opacity: 0.75;
-      margin-top: 8px;
+      position: absolute;
+      top: 20px;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    /* Start button */
+    #start {
+      position: absolute;
+      bottom: 30px;
+      z-index: 4;
+      padding: 12px 22px;
+      border-radius: 24px;
+      border: none;
+      font-size: 15px;
+      cursor: pointer;
     }
   </style>
 </head>
 
 <body>
-  <div class="card">
-    <h1>WELCOME</h1>
-    <p>Tap to start</p>
+  <div class="stage">
+    <div class="bg0"></div>
 
-    <div class="camera">
-      <video id="video" muted playsinline></video>
+    <div class="camera-wrap">
+      <video id="video" playsinline muted></video>
     </div>
 
-    <button id="start">Start Experience</button>
+    <div class="bg1"></div>
 
-    <div id="name"></div>
-    <div id="status">Waiting…</div>
+    <div class="ui">
+      <div id="status">Camera permission required</div>
+      <div id="name"></div>
+    </div>
+
+    <button id="start">Start</button>
   </div>
-
-  <script>
-    /* ================= CONFIG ================= */
-
-    const MODEL_URL =
-      "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
-
-    const KNOWN_USERS = [
-      { label: "kiet", dir: "kiet", samples: 3 },
-      { label: "linh", dir: "linh", samples: 2 },
-      { label: "minh", dir: "minh", samples: 2 },
-      { label: "sonji", dir: "sonji", samples: 2 }
-    ];
-
-    const THRESHOLD = 0.5;
-
-    /* ========================================== */
-
-    const video = document.getElementById("video");
-    const statusEl = document.getElementById("status");
-    const nameEl = document.getElementById("name");
-    const startBtn = document.getElementById("start");
-
-    async function loadModels() {
-      statusEl.innerText = "Loading models…";
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-      ]);
-    }
-
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 720 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
-
-      video.srcObject = stream;
-
-      return new Promise(resolve => {
-        video.onloadedmetadata = () => {
-          video.play();
-          resolve();
-        };
-      });
-    }
-
-    async function loadKnownFaces() {
-      statusEl.innerText = "Preparing faces…";
-
-      return Promise.all(
-        KNOWN_USERS.map(async user => {
-          const descriptors = [];
-
-          for (let i = 1; i <= user.samples; i++) {
-            const img = await faceapi.fetchImage(
-              `/faces/${user.dir}/${i}.jpg`
-            );
-
-            const det = await faceapi
-              .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
-              .withFaceLandmarks()
-              .withFaceDescriptor();
-
-            if (det) descriptors.push(det.descriptor);
-          }
-
-          return new faceapi.LabeledFaceDescriptors(
-            user.label,
-            descriptors
-          );
-        })
-      );
-    }
-
-    async function recognize(matcher) {
-      statusEl.innerText = "Looking for your face…";
-      let locked = false;
-
-      const interval = setInterval(async () => {
-        if (locked) return;
-
-        const det = await faceapi
-          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-
-        if (!det) return;
-
-        const best = matcher.findBestMatch(det.descriptor);
-
-        if (best.label !== "unknown") {
-          locked = true;
-          nameEl.innerText = `Welcome, ${best.label}`;
-          statusEl.innerText = "Recognized";
-          startBtn.style.display = "none";
-          clearInterval(interval);
-        }
-      }, 600);
-    }
-
-    startBtn.addEventListener("click", async () => {
-      try {
-        startBtn.disabled = true;
-        await loadModels();
-        await startCamera();
-
-        const labeled = await loadKnownFaces();
-        const matcher = new faceapi.FaceMatcher(labeled, THRESHOLD);
-
-        recognize(matcher);
-      } catch (e) {
-        console.error(e);
-        statusEl.innerText = `${e.name}: ${e.message}`;
-        startBtn.disabled = false;
-      }
-    });
-  </script>
 </body>
 </html>

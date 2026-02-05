@@ -151,10 +151,12 @@ function startRecognition(faceMatcher) {
     if (bestMatch.label !== "unknown") {
       locked = true;
 
-      nameEl.innerText = `Welcome, ${bestMatch.label}`;
-      statusEl.innerText = "Recognized";
+      nameEl.innerText = bestMatch.label;
+      nameEl.classList.add("show");
 
+      statusEl.innerText = "Recognized";
       startBtn.style.display = "none";
+      
       clearInterval(timer);
     }
   }, DETECT_INTERVAL);
